@@ -1,7 +1,5 @@
 package types
 
-const MaxBatchLimit = 4 * 1024 * 1024
-
 type User struct {
 	ID                  int64  `json:"id"`
 	Name                string `json:"user_name"`

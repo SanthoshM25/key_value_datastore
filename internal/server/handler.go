@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -14,36 +13,41 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+const (
+	minTTL     = 0
+	maxTTL     = 4102444800
+	maxKeySize = 32
+)
+
 func RegisterHandler(db db.Database) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		user := &types.User{}
+
 		err := utils.ExtractRequestBody(r.Body, user)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			err = utils.ErrBadRequest(utils.InvalidBodyErr)
+			sendHTTPResponse(nil, err, w)
 			return
 		}
-		if err := auth.Register(db, user); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write([]byte("User registered successfully"))
+
+		err = auth.Register(db, user)
+		sendHTTPResponse(nil, err, w)
 	}
 }
 
 func LoginHandler(db db.Database) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		user := &types.User{}
+
 		err := utils.ExtractRequestBody(r.Body, user)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			err = utils.ErrBadRequest(utils.InvalidBodyErr)
+			sendHTTPResponse(nil, err, w)
 			return
 		}
-		token, err := auth.Login(db, user)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write([]byte(token))
+
+		body, err := auth.Login(db, user)
+		sendHTTPResponse(body, err, w)
 	}
 }
 
@@ -51,98 +55,143 @@ func AuthHandler(db db.Database, h httprouter.Handle) func(w http.ResponseWriter
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		token := r.Header.Get("Authorization")
 		if token == "" {
-			http.Error(w, "Authorization token not found", http.StatusUnauthorized)
+			sendHTTPResponse(nil, utils.ErrUnAuthorized("authorization token not found"), w)
 			return
 		}
+
 		claims, err := auth.ValidateToken(token)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			sendHTTPResponse(nil, utils.ErrUnAuthorized(err.Error()), w)
 			return
 		}
 		ps = append(ps, httprouter.Param{Key: "user_id", Value: fmt.Sprintf("%d", claims.UserID)})
+
 		h(w, r, ps)
 	}
 }
 
 func CreateObjectHandler(db db.Database) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		userID := ps.ByName("user_id")
-		userIDInt, err := strconv.Atoi(userID)
+		userId, err := extractUserId(ps)
 		if err != nil {
-			http.Error(w, "Invalid user id", http.StatusBadRequest)
+			sendHTTPResponse(nil, err, w)
+			return
 		}
+
 		object := &types.Object{}
 		err = utils.ExtractRequestBody(r.Body, object)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			sendHTTPResponse(nil, err, w)
 			return
 		}
-		fmt.Println("object", object)
-		if err := db.CreateObject(userIDInt, object); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+
+		if err := validateObject(object); err != nil {
+			sendHTTPResponse(nil, err, w)
 			return
 		}
-		w.Write([]byte("Object created successfully"))
+
+		err = db.CreateObject(userId, object)
+		sendHTTPResponse(nil, err, w)
 	}
 }
 
 func GetObjectHandler(db db.Database) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		userID := ps.ByName("user_id")
-		userIDInt, err := strconv.Atoi(userID)
+		userID, err := extractUserId(ps)
 		if err != nil {
-			http.Error(w, "Invalid user id", http.StatusBadRequest)
+			sendHTTPResponse(nil, err, w)
+			return
 		}
 		key := ps.ByName("key")
-		object, err := db.GetObject(userIDInt, key)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		resp, err := json.Marshal(object)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write(resp)
+		object, err := db.GetObject(userID, key)
+		sendHTTPResponse(object, err, w)
 	}
 }
 
 func DeleteObjectHandler(db db.Database) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		//TODO: put this user_id handling into an function
-		userID := ps.ByName("user_id")
-		userIDInt, err := strconv.Atoi(userID)
+		userID, err := extractUserId(ps)
 		if err != nil {
-			http.Error(w, "Invalid user id", http.StatusBadRequest)
-		}
-		key := ps.ByName("key")
-		if err := db.DeleteObject(userIDInt, key); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			sendHTTPResponse(nil, err, w)
 			return
 		}
-		w.Write([]byte("Object deleted successfully"))
+		key := ps.ByName("key")
+		err = db.DeleteObject(userID, key)
+		sendHTTPResponse(nil, err, w)
 	}
 }
 
 func BatchCreateObjectHandler(db db.Database) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		userID := ps.ByName("user_id")
-		userIDInt, err := strconv.Atoi(userID)
+		userId, err := extractUserId(ps)
 		if err != nil {
-			http.Error(w, "Invalid user id", http.StatusBadRequest)
-		}
-		var objects []*types.Object
-		err = utils.ExtractRequestBody(r.Body, &objects)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			sendHTTPResponse(nil, err, w)
 			return
 		}
 
-		if err := db.BatchCreateObject(userIDInt, objects); err != nil {
+		var objects []*types.Object
+		err = utils.ExtractRequestBody(r.Body, &objects)
+		if err != nil {
+			sendHTTPResponse(nil, err, w)
+			return
+		}
+
+		err = db.BatchCreateObject(userId, objects)
+		sendHTTPResponse(nil, err, w)
+	}
+}
+
+func sendHTTPResponse(body any, err error, w http.ResponseWriter) {
+	var statusCode int
+	var resp any
+
+	if err == nil {
+		if body == nil {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		statusCode = http.StatusOK
+		resp = body
+	} else {
+		if respErr, ok := err.(*utils.Error); ok {
+			statusCode = respErr.Code
+			resp = respErr
+		} else {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Write([]byte("Objects created successfully using batch operation"))
 	}
+
+	writeResponse(statusCode, resp, w)
+}
+
+func writeResponse(statusCode int, resp any, w http.ResponseWriter) {
+	respBody, marshalErr := utils.MarshalResponse(resp)
+	if marshalErr != nil {
+		http.Error(w, marshalErr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	w.Write(respBody)
+}
+
+func extractUserId(ps httprouter.Params) (int, error) {
+	userID := ps.ByName("user_id")
+	userIDInt, err := strconv.Atoi(userID)
+	if err != nil {
+		return 0, utils.ErrBadRequest("invalid user ID")
+	}
+	return userIDInt, nil
+}
+
+func validateObject(obj *types.Object) error {
+	if obj.TTL < minTTL || obj.TTL > maxTTL {
+		return utils.ErrBadRequest("ttl must be between 0 and 31536000")
+	}
+	if len(obj.Key) > maxKeySize {
+		return utils.ErrBadRequest("key size exceeded, must be within %d characters", maxKeySize)
+	}
+	return nil
 }

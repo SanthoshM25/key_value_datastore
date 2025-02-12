@@ -1,1 +1,65 @@
 # key_value_datastore
+
+## Overview
+
+This project implements both single object and batch operations while enforcing storage quotas, key/value size limits, and TTL (time-to-live) expirations. Security and multi-tenancy are core aspects of the design, ensuring that each tenant's data is isolated and managed according to their configured usage.
+
+## Design Choices
+
+- **Go Language:**  
+  The project is fully implemented in Go. Its native support for concurrency, and performance characteristics make it an ideal choice for this project.
+
+- **Security & Access Control:**  
+  User authentication is enforced via JWT tokens. API handlers extract a tenant's unique identifier from the token to ensure that each user can only access their own data. This enforces secure multi-tenancy.
+
+- **Database schema design:**  
+    ![database schema](./schema.png)
+
+    - **Transactions:**  
+        All write operations (create, batch create, delete) are wrapped in transactions. This guarantees atomicity — either all changes succeed or none are applied.
+
+    - **Schema Migrations:**  
+        The project uses a `flyway` migration tool to manage database schema changes. The migration files are stored in the `internal/db/schema` directory.
+
+    - **Quota Checks:**  
+        Each user (tenant) is assigned a provisioned storage capacity. A separate quotas table tracks both the provisioned limit and the storage currently utilized. All object operations update the tenant's quota accordingly.
+
+        During object creation (both single and batch):
+        - The service computes the size of the JSON-serialized value.
+        - It checks if adding the new object(s) would exceed the tenant's remaining quota.
+        - For the batch API, the total combined size of all objects is calculated and validated against both the tenant's available capacity and an enforced limit (e.g., a combined 4MB limit).
+
+    - **Individual Object Operations:**  
+        - **Key Limit:** Keys are restricted to 32 characters.
+        - **Value Limit:** Each JSON object is limited to   16KB.
+        - **TTL Support:** Each object may have an associated TTL. Objects become unavailable once their TTL expires.
+
+    - **Batch Operations:**  
+        Batch creation aggregates multiple objects to allow efficient uploads. The design includes:
+        - **Combined Size Limit:** The total combined size of the JSON-encoded values is capped (e.g., 4MB). This guard is critical for ensuring that batch requests do not overwhelm the system.
+        - **Single Transaction:** Batch operations are executed within a single DB transaction to maintain atomicity and consistency.
+        - **SQL Placeholders:** The implementation builds a single SQL query with multiple placeholders to update/inject the data store efficiently. 
+    - **TTL Expiry Handling:**  
+        Uses SQL Event Schedulerto handle TTL expiry. It is scheduled to run every day to cleanup the expired data from the data store. 
+        
+        Can be improved to handle TTL expiry in real-time like every 10 minutes but have to consider the trade-off between the cleanup frequency and the cost impact.
+- **Logging:**  
+   Uses structured logging (e.g., via `slog`) that records key events and error details. This enhances troubleshooting and monitoring when coupled with a monitoring tool.
+
+- **Integration Tests:**  
+  Integration tests are written using Ginkgo and Gomega. They cover:
+  - Basic CRD operations.
+  - Boundary conditions (e.g., key length, value size).
+  - Batch operations with combined value size tests – verifying scenarios where the total size is just below or above the 4MB limit.
+  - Quota enforcement to ensure tenant-level constraints are honored.
+
+### Future Enhancements
+  
+- **Rate Limiting:**  
+  Implement rate limiting to prevent security attacks, abuse from a single tenant.
+
+- **Caching:**  
+  Implement caching to improve performance for handling quota checks.
+  
+- **Enhanced Monitoring:**  
+  Integrate with monitoring tools (e.g., Prometheus, Cloudwatch) to collect metrics on request rates, error rates, and system performance.

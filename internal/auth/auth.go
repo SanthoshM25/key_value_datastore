@@ -1,18 +1,23 @@
 package auth
 
 import (
-	"fmt"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/santhoshm25/key-value-ds/internal/db"
 	"github.com/santhoshm25/key-value-ds/types"
+	"github.com/santhoshm25/key-value-ds/utils"
 
 	"github.com/golang-jwt/jwt"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO: use env
-var jwtKey = []byte("my_secret_key")
+const (
+	DefaultProvisionedCapacity = 1073741824 // 1GB
+)
+
+var jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
 type Claims struct {
 	UserID int64 `json:"user_id"`
@@ -21,36 +26,39 @@ type Claims struct {
 
 func Register(db db.Database, user *types.User) error {
 	if user.Name == "" || user.Password == "" {
-		return fmt.Errorf("username and password cannot be empty")
+		return utils.ErrBadRequest(utils.InvalidCredErr)
 	}
 
 	if user.ProvisionedCapacity == 0 {
-		user.ProvisionedCapacity = 1073741824
+		user.ProvisionedCapacity = DefaultProvisionedCapacity
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		slog.Error("error generating hashed password", "error", err)
+		return utils.ErrInternalServer("")
 	}
+
 	user.Password = string(hashedPassword)
-	if err := db.CreateUser(user); err != nil {
-		return err
-	}
-	return nil
+	return db.CreateUser(user)
 }
 
-func Login(db db.Database, user *types.User) (string, error) {
+func Login(db db.Database, user *types.User) (map[string]string, error) {
 	if user.Name == "" || user.Password == "" {
-		return "", fmt.Errorf("username and password cannot be empty")
+		return nil, utils.ErrBadRequest(utils.InvalidCredErr)
 	}
+
 	userRec, err := db.GetUser(user.Name)
 	if err != nil {
-		return "", fmt.Errorf("user not found, %s", err.Error())
+		return nil, utils.ErrNotFound(utils.UserNotFoundErr)
 	}
+
 	err = bcrypt.CompareHashAndPassword([]byte(userRec.Password), []byte(user.Password))
 	if err != nil {
-		return "", fmt.Errorf("password mismatch %s", err.Error())
+		slog.Error("error comparing hash and password", "error", err)
+		return nil, utils.ErrBadRequest(utils.InvalidCredErr)
 	}
+
 	expirationTime := time.Now().Add(1 * time.Hour)
 	claims := &Claims{
 		UserID: userRec.ID,
@@ -58,13 +66,14 @@ func Login(db db.Database, user *types.User) (string, error) {
 			ExpiresAt: expirationTime.Unix(),
 		},
 	}
-	//TODO: check if the signing algo is fine or should go with SHA256
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
-		return "", fmt.Errorf("error in generating token: %s", err.Error())
+		slog.Error("error signing token", "error", err)
+		return nil, utils.ErrInternalServer("")
 	}
-	return tokenString, nil
+	return map[string]string{"token": tokenString}, nil
 }
 
 func ValidateToken(tokenString string) (*Claims, error) {
@@ -73,11 +82,14 @@ func ValidateToken(tokenString string) (*Claims, error) {
 		return jwtKey, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error in parsing token: %s", err.Error())
+		slog.Error("error parsing token", "error", err)
+		return nil, utils.ErrInternalServer("")
 	}
+
 	var ok bool
 	if claims, ok = token.Claims.(*Claims); !ok || !token.Valid {
-		return nil, fmt.Errorf("invalid token")
+		slog.Error("invalid token", "error", err)
+		return nil, utils.ErrUnAuthorized("")
 	}
 	return claims, nil
 }

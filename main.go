@@ -4,16 +4,18 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/julienschmidt/httprouter"
+
 	"github.com/santhoshm25/key-value-ds/internal/db/mysql"
 	"github.com/santhoshm25/key-value-ds/internal/server"
-
-	"github.com/julienschmidt/httprouter"
+	"github.com/santhoshm25/key-value-ds/utils"
 )
 
 func main() {
+	utils.InitEnv()
+
 	msDB := mysql.NewDB()
 	msDB.Init()
-	defer log.Fatal(msDB.Db.Close().Error())
 
 	router := httprouter.New()
 	router.POST("/api/auth/register", server.RegisterHandler(msDB))
@@ -24,4 +26,6 @@ func main() {
 	router.POST("/api/batch/object", server.AuthHandler(msDB, server.BatchCreateObjectHandler(msDB)))
 
 	log.Fatal(http.ListenAndServe(":8080", router))
+
+	defer log.Fatal(msDB.Db.Close())
 }
