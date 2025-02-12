@@ -88,10 +88,20 @@ The setup is complete and the application is ready to use. Try by making request
         - **Combined Size Limit:** The total combined size of the JSON-encoded values is capped (e.g., 4MB). This guard is critical for ensuring that batch requests do not overwhelm the system.
         - **Single Transaction:** Batch operations are executed within a single DB transaction to maintain atomicity and consistency.
         - **SQL Placeholders:** The implementation builds a single SQL query with multiple placeholders to update/inject the data store efficiently. 
+   
     - **TTL Expiry Handling:**  
         Uses SQL Event Schedulerto handle TTL expiry. It is scheduled to run every day to cleanup the expired data from the data store. 
         
         Can be improved to handle TTL expiry in real-time like every 10 minutes but have to consider the trade-off between the cleanup frequency and the cost impact.
+
+        ```
+        CREATE EVENT clean_expired_data
+        ON SCHEDULE EVERY 1 DAY
+        DO
+          DELETE FROM data_store
+          WHERE ttl != 0 AND ttl < UNIX_TIMESTAMP(NOW());
+        ```
+
 - **Logging:**  
    Uses structured logging (e.g., via `slog`) that records key events and error details. This enhances troubleshooting and monitoring when coupled with a monitoring tool.
 
