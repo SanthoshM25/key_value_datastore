@@ -48,7 +48,7 @@ The setup is complete and the application is ready to use. Try by making request
 ***Steps:***
 1. Clone the repository.
 2. Start the MySQL server and create a database named `key_value_store`.
-3. Update the database credentials in the `.env` file and in the `internal/db/schema/flyway.conf` file.
+3. Update the database credentials in the [.env](./.env) file and in the [flyway.conf](./internal/db/schema/flyway.conf) file.
 4. Run `make migrate` to setup the database.
 5. Run `make run` to start the server.
 6. Run `make test` to run the tests.
@@ -68,7 +68,7 @@ The setup is complete and the application is ready to use. Try by making request
         All write operations (create, batch create, delete) are wrapped in transactions. This guarantees atomicity — either all changes succeed or none are applied.
 
     - **Schema Migrations:**  
-        The project uses a `flyway` migration tool to manage database schema changes. The migration files are stored in the `internal/db/schema` directory.
+        The project uses a `flyway` migration tool to manage database schema changes. The migration files are stored in the [schema](./internal/db/schema) directory.
 
     - **Quota Checks:**  
         Each user (tenant) is assigned a provisioned storage capacity. A separate quotas table tracks both the provisioned limit and the storage currently utilized. All object operations update the tenant's quota accordingly.
@@ -111,6 +111,9 @@ The setup is complete and the application is ready to use. Try by making request
   - Boundary conditions (e.g., key length, value size).
   - Batch operations with combined value size tests – verifying scenarios where the total size is just below or above the 4MB limit.
   - Quota enforcement to ensure tenant-level constraints are honored.
+
+- **Documentation**
+  All the API behaviours are captured and documented in an API specification documents following the OpenAPI conventions. The spec file is attached in the [swagger.yaml](./swagger.yaml) file.
 
 ### Future Enhancements
   
