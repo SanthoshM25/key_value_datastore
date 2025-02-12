@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -9,6 +10,10 @@ import (
 	"github.com/santhoshm25/key-value-ds/internal/db/mysql"
 	"github.com/santhoshm25/key-value-ds/internal/server"
 	"github.com/santhoshm25/key-value-ds/utils"
+)
+
+const (
+	port = ":8080"
 )
 
 func main() {
@@ -25,7 +30,8 @@ func main() {
 	router.DELETE("/api/object/:key", server.AuthHandler(msDB, server.DeleteObjectHandler(msDB)))
 	router.POST("/api/batch/object", server.AuthHandler(msDB, server.BatchCreateObjectHandler(msDB)))
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+	slog.Info("Starting server on", "port", port)
+	log.Fatal(http.ListenAndServe(port, router))
 
 	defer log.Fatal(msDB.Db.Close())
 }

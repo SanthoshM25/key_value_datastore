@@ -4,6 +4,55 @@
 
 This project implements both single object and batch operations while enforcing storage quotas, key/value size limits, and TTL (time-to-live) expirations. Security and multi-tenancy are core aspects of the design, ensuring that each tenant's data is isolated and managed according to their configured usage.
 
+## Setup
+
+**Docker Setup(Recommended):**
+
+***Prerequisites:***
+- Docker
+
+***Steps:***
+1. Create a docker network for the services to communicate with each other.
+```
+docker network create kv-network
+```
+2. Start the MySQL container.
+```
+docker run --name mysql --network kv-network -e MYSQL_ROOT_PASSWORD=<password> -d mysql:8
+```
+3. Create the database in the container.
+```
+docker exec -it mysql mysql -uroot -p -e "CREATE DATABASE key_value_store;"
+```
+  Once this command is executed the CLI will prompt for the password. Enter the password provided in step 2 and press enter.
+
+4. Start the Datastore application container.
+```
+docker run --name kv-store --network kv-network -p 8080:8080 -d santhosh2504/kv-store
+```
+5. Run the database migrations to create the tables.
+```
+docker exec -it kv-store bash -c "cd  ./migrations && flyway migrate"
+```
+The setup is complete and the application is ready to use. Try by making request to `localhost:8080`
+
+***Note:*** To run the tests, run `make test` from the root directory after finishing the setup(can be anything docker setup or local setup). This step has to be followed by cloning the repository and running the `make test` command from the root directory. 
+
+
+**Local Setup:**
+***Prerequisites:***
+- Go
+- MySQL
+- Flyway
+
+***Steps:***
+1. Clone the repository.
+2. Start the MySQL server and create a database named `key_value_store`.
+3. Update the database credentials in the `.env` file and in the `internal/db/schema/flyway.conf` file.
+4. Run `make migrate` to setup the database.
+5. Run `make run` to start the server.
+6. Run `make test` to run the tests.
+
 ## Design Choices
 
 - **Go Language:**  

@@ -1,0 +1,230 @@
+openapi: 3.0.3
+info:
+  title: key_value_datastore API
+  version: "1.0.0"
+  description: |
+    This API provides endpoints for a key-value datastore that supports Create, Read,
+    and Delete operations for individual objects and in batch. It also supports user
+    registration, authentication, quota enforcement, TTL expiration, and secure multi-tenancy.
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /api/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      description: Register a new user (tenant) with a name, password, and provisioned storage capacity.
+      requestBody:
+        description: User registration payload.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+      responses:
+        '201': 
+          description: User registered successfully.
+        '400':
+          description: Bad Request - Invalid input or user already exists.
+        '500': &InternalError
+          description: Internal Server Error - Unexpected internal error occured.
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Log in a user and obtain a JWT token.
+      description: |
+        Authenticate a user using their name and password. On success, a JWT token is returned
+        which must be used to authenticate subsequent requests.
+      requestBody:
+        description: User login credentials.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Login successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Unauthorized - Invalid credentials.
+        '404':
+          description: Not Found - User not found.
+        '500': *InternalError
+  /api/object:
+    post:
+      tags:
+        - Object
+      summary: Create a new key-value pair.
+      security:
+        - BearerAuth: []
+      description: |
+        Creates a new object with a key, an associated JSON object (data) and a TTL (time-to-live).
+        Keys are restricted to 32 characters, while data is limited to 16KB.
+      requestBody:
+        description: Object creation payload.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObjectRequest'
+      responses:
+        '201': &ObjectCreated
+          description: Object created successfully.
+        '400':
+          description: Bad Request - Invalid input, duplicate key, or limits exceeded.
+        '500': *InternalError
+  /api/object/{key}:
+    get:
+      tags:
+        - Object
+      summary: Retrieve a key-value pair.
+      security:
+        - BearerAuth: []
+      description: Retrieve the object corresponding to the given key.
+      parameters:
+        - in: path
+          name: key
+          schema:
+            type: string
+          required: true
+          description: The key of the object to retrieve.
+      responses:
+        '200':
+          description: Object retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectResponse'
+        '404':
+          description: Object not found.
+        '500': *InternalError
+    delete:
+      tags:
+        - Object
+      summary: Delete a key-value pair.
+      security:
+        - BearerAuth: []
+      description: Delete the object identified by the key.
+      parameters:
+        - in: path
+          name: key
+          schema:
+            type: string
+          required: true
+          description: The key of the object to delete.
+      responses:
+        '204':
+          description: Object deleted successfully.
+        '500': *InternalError
+  /api/batch/object:
+    post:
+      tags:
+        - Batch
+      summary: Create multiple key-value pairs in a single request.
+      security:
+        - BearerAuth: []
+      description: |
+        Creates a batch of objects. The endpoint accepts an array of objects and the combined
+        size of the JSON-encoded data must be below a configured limit (e.g., 4MB). Each object
+        must include a key, data, and TTL.
+      requestBody:
+        description: Array of object creation requests.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ObjectRequest'
+      responses:
+        '201':
+          description: Batch objects created successfully.
+        '400':
+          description: Bad Request - Combined value size exceeds limit or invalid input.
+        '500': *InternalError
+components:
+  schemas:
+    UserRegistration:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The user's name.
+        password:
+          type: string
+          description: The user's password.
+        provisionedCapacity:
+          type: integer
+          description: Provisioned storage capacity in bytes.
+      required:
+        - name
+        - password
+        - provisionedCapacity
+    UserLogin:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The user's name.
+        password:
+          type: string
+          description: The user's password.
+      required:
+        - name
+        - password
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token to be used for further authenticated requests.
+      required:
+        - token
+    ObjectRequest:
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 32
+          description: |
+            The key for the object. Must be unique and is limited to 32 characters.
+        data:
+          type: object
+          description: |
+            The JSON object to be stored. This object is limited to a maximum size of 16KB.
+        ttl:
+          type: integer
+          description: Time-to-live in seconds. The object expires once its TTL is reached.
+      required:
+        - key
+        - data
+        - ttl
+    ObjectResponse:
+      type: object
+      properties:
+        key:
+          type: string
+          description: The key of the object.
+        data:
+          type: object
+          description: The stored JSON object.
+        ttl:
+          type: integer
+          description: The TTL of the object.
+      required:
+        - key
+        - data
+        - ttl
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT 
