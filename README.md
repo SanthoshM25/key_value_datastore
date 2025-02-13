@@ -51,7 +51,7 @@ The setup is complete and the application is ready to use. Try by making request
 ***Steps:***
 1. Clone the repository.
 2. Start the MySQL server and create a database named `key_value_store`.
-3. Update the database credentials in the [.env.template](./.env.template) file and in the [flyway.conf](./internal/db/schema/flyway.conf) file.
+3. Update the database credentials in the [.env.template](./.env.template) file, and save it as `.env` and in the [flyway.conf](./internal/db/schema/flyway.conf) file.
 4. Run `make migrate` to setup the database.
 5. Run `make run` to start the server.
 6. Run `make test` to run the tests.
