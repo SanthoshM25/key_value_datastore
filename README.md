@@ -106,7 +106,7 @@ The setup is complete and the application is ready to use. Try by making request
         ```
 
 - **Logging:**  
-   Uses structured logging (e.g., via `slog`) that records key events and error details. This enhances troubleshooting and monitoring when coupled with a monitoring tool.
+   Uses structured logging (`slog`) that records key events and error details. This enhances troubleshooting and monitoring when coupled with a monitoring tool.
 
 - **Integration Tests:**  
   Integration tests are written using Ginkgo and Gomega. They cover:
