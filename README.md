@@ -48,7 +48,7 @@ The setup is complete and the application is ready to use. Try by making request
 ***Steps:***
 1. Clone the repository.
 2. Start the MySQL server and create a database named `key_value_store`.
-3. Update the database credentials in the [.env](./.env) file and in the [flyway.conf](./internal/db/schema/flyway.conf) file.
+3. Update the database credentials in the [.env.template](./.env.template) file and in the [flyway.conf](./internal/db/schema/flyway.conf) file.
 4. Run `make migrate` to setup the database.
 5. Run `make run` to start the server.
 6. Run `make test` to run the tests.
@@ -125,3 +125,11 @@ The setup is complete and the application is ready to use. Try by making request
   
 - **Enhanced Monitoring:**  
   Integrate with monitoring tools (e.g., Prometheus, Cloudwatch) to collect metrics on request rates, error rates, and system performance.
+
+### Compatability
+With the docker setup, the application should be up and running in all the operating systems that supports docker.
+
+In scenario of cloning and running the application locally, it is tested with linux, so it should work with any linux based system, and mac os, but not sure about windows.
+
+### Time spent
+It took me around ~12 hours to complete the project. And an additional 1 hours for the documentation and containerizing the application.
