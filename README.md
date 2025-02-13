@@ -135,4 +135,4 @@ With the docker setup, the application should be up and running in all the opera
 In scenario of cloning and running the application locally, it is tested with linux, so it should work with any linux based system, and mac os, but not sure about windows.
 
 ### Time spent
-It took me around ~12 hours to complete the project. And an additional 1 hours for the documentation and containerizing the application.
+It took me around ~7 hours to complete the project. And an additional 1 hours for the documentation and containerizing the application.
