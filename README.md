@@ -12,6 +12,7 @@ This project implements both single object and batch operations while enforcing 
 - Docker
 
 ***Steps:***
+
 Note: Use the exact docker commands with the containers and names to avoid any possible credentials mismatch.
 
 1. Create a docker network for the services to communicate with each other.
