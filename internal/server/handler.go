@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/santhoshm25/key-value-ds/internal/auth"
 	"github.com/santhoshm25/key-value-ds/internal/db"
@@ -103,7 +104,18 @@ func GetObjectHandler(db db.Database) httprouter.Handle {
 			return
 		}
 		key := ps.ByName("key")
+
 		object, err := db.GetObject(userID, key)
+		if err != nil {
+			sendHTTPResponse(nil, err, w)
+			return
+		}
+
+		err = validateTTL(object.TTL)
+		if err != nil {
+			go db.DeleteObject(userID, key)
+		}
+
 		sendHTTPResponse(object, err, w)
 	}
 }
@@ -192,6 +204,13 @@ func validateObject(obj *types.Object) error {
 	}
 	if len(obj.Key) > maxKeySize {
 		return utils.ErrBadRequest("key size exceeded, must be within %d characters", maxKeySize)
+	}
+	return nil
+}
+
+func validateTTL(ttl int64) error {
+	if ttl < time.Now().Unix() {
+		return utils.ErrNotFound("object expired")
 	}
 	return nil
 }
