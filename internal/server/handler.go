@@ -209,7 +209,7 @@ func validateObject(obj *types.Object) error {
 }
 
 func validateTTL(ttl int64) error {
-	if ttl < time.Now().Unix() {
+	if ttl != 0 && ttl < time.Now().Unix() {
 		return utils.ErrNotFound("object expired")
 	}
 	return nil
