@@ -1,6 +1,7 @@
 FROM amazonlinux:2
 
-RUN yum install -y tar wget gzip
+RUN yum install -y tar wget gzip make
+
 
 RUN wget https://go.dev/dl/go1.24.0.linux-amd64.tar.gz && \
     tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz && \
@@ -17,7 +18,8 @@ WORKDIR /app
 
 COPY ./datastore .
 COPY ./.env .
-COPY ./internal/db/schema/ ./migrations
+COPY ./internal/db/schema/ ./internal/db/schema/
+COPY ./Makefile .
 
 EXPOSE 8080
 

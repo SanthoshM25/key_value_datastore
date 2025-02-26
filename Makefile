@@ -13,8 +13,13 @@ test: clean migrate
 
 .PHONY: clean
 clean:
-	cd ./internal/db/schema && flyway clean
+	cd ./internal/db/schema && flyway clean -url=$(URL) -user=$(USER) -password=$(PASSWORD) 
 	
 .PHONY: migrate
 migrate:
-	cd ./internal/db/schema && flyway migrate
+	cd ./internal/db/schema && flyway migrate -url=$(URL) -user=$(USER) -password=$(PASSWORD)
+
+.PHONY: prepare
+prepare: 
+	make clean 
+	make migrate
