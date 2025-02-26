@@ -16,6 +16,7 @@ const (
 	ObjectDeleteErr      = "error deleting object"
 	ObjectBatchCreateErr = "error creating objects"
 	ObjectCreated        = "object created successfully"
+	ObjectNotFoundErr    = "object not found"
 	QuotaExceededErr     = "quota exceeded"
 	InvalidBodyErr       = "invalid request body"
 	EmptyBodyErr         = "empty request body"
@@ -61,6 +62,13 @@ func ErrUnAuthorized(msg string, params ...any) error {
 		msg = "user unauthorized"
 	}
 	return NewError(http.StatusUnauthorized, msg, params...)
+}
+
+func ErrForbidden(msg string, params ...any) error {
+	if msg == "" {
+		msg = "forbidden"
+	}
+	return NewError(http.StatusForbidden, msg, params...)
 }
 
 func ErrInternalServer(msg string, params ...any) error {

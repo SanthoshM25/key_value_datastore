@@ -7,7 +7,8 @@ CREATE TABLE users (
 CREATE TABLE quotas (
     user_id INT PRIMARY KEY, 
     provisioned INT NOT NULL, 
-    utilised INT NOT NULL
+    utilised INT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE data_store (
@@ -15,7 +16,9 @@ CREATE TABLE data_store (
     data_key VARCHAR(32), 
     data_value JSON, 
     ttl INT, 
-    PRIMARY KEY(user_id, data_key)
+    PRIMARY KEY(user_id, data_key),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX ttl_index (ttl)
 );
 
 CREATE EVENT clean_expired_data

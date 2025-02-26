@@ -1,7 +1,10 @@
 package server
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,9 +18,9 @@ import (
 )
 
 const (
-	minTTL     = 0
-	maxTTL     = 4102444800
-	maxKeySize = 32
+	maxKeySize    = 32
+	maxBatchLimit = 4194304 //4MB
+
 )
 
 func RegisterHandler(db db.Database) httprouter.Handle {
@@ -113,6 +116,7 @@ func GetObjectHandler(db db.Database) httprouter.Handle {
 
 		err = validateTTL(object.TTL)
 		if err != nil {
+			err = utils.ErrNotFound(utils.ObjectNotFoundErr)
 			go db.DeleteObject(userID, key)
 		}
 
@@ -199,8 +203,9 @@ func extractUserId(ps httprouter.Params) (int, error) {
 }
 
 func validateObject(obj *types.Object) error {
-	if obj.TTL < minTTL || obj.TTL > maxTTL {
-		return utils.ErrBadRequest("ttl must be between 0 and 31536000")
+	err := validateTTL(obj.TTL)
+	if err != nil {
+		return utils.ErrBadRequest(err.Error())
 	}
 	if len(obj.Key) > maxKeySize {
 		return utils.ErrBadRequest("key size exceeded, must be within %d characters", maxKeySize)
@@ -210,7 +215,40 @@ func validateObject(obj *types.Object) error {
 
 func validateTTL(ttl int64) error {
 	if ttl != 0 && ttl < time.Now().Unix() {
-		return utils.ErrNotFound("object expired")
+		return errors.New("invalid ttl")
 	}
 	return nil
+}
+
+func ValidateAndPrepareBatchRequest(userID int, objs []*types.Object, availableBytes int64) (int64, []string, []any, error) {
+	batchSize := int64(0)
+	queryPlaceholders := make([]string, len(objs))
+	queryArgs := make([]any, 0)
+
+	for idx, obj := range objs {
+		err := validateObject(obj)
+		if err != nil {
+			return 0, []string{}, []any{}, err
+		}
+
+		valBytes, err := json.Marshal(obj.Value)
+		if err != nil {
+			slog.Error("error marshalling value", "error", err)
+			return 0, []string{}, []any{}, utils.ErrBadRequest("error marshalling value: %s", err.Error())
+		}
+
+		obj.Value = valBytes
+		batchSize += int64(len(valBytes))
+		slog.Info("batchSize", "value", batchSize)
+		queryPlaceholders[idx] = "(?, ?, ?, ?)"
+		queryArgs = append(queryArgs, userID, obj.Key, obj.Value, obj.TTL)
+	}
+	if batchSize > availableBytes {
+		return 0, []string{}, []any{}, utils.ErrForbidden(utils.QuotaExceededErr)
+	}
+	if batchSize > maxBatchLimit {
+		return 0, []string{}, []any{}, utils.ErrBadRequest("batch size limit exceeded, max limit is %d", maxBatchLimit)
+	}
+
+	return batchSize, queryPlaceholders, queryArgs, nil
 }
