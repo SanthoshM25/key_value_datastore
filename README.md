@@ -31,7 +31,7 @@ docker exec -it mysql mysql -uroot -p -e "CREATE DATABASE key_value_store;"
 
 4. Start the Datastore application container.
 ```
-docker run --name kv-store --network kv-network e DATABASE_URL="root:<password>@tcp(mysql:3306)/key_value_store" -p 8080:8080 -d santhosh2504/kv-store
+docker run --name kv-store --network kv-network -e DATABASE_URL="root:<password>@tcp(mysql:3306)/key_value_store" -p 8080:8080 -d santhosh2504/kv-store
 ```
 5. Run the database migrations to create the tables.
 ```
