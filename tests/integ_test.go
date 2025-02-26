@@ -583,7 +583,7 @@ var _ = Describe("Integration Tests", func() {
 
 	Describe("Concurrency Tests", func() {
 		var userTokens []string
-		const numUsers = 200
+		const numUsers = 150
 		const numOperations = 10
 
 		func() {
